@@ -13,3 +13,6 @@ desktop/publish/
 desktop/smoke-reports/
 .vs/
 
+fate/publish/
+fate/smoke-reports/
+
