@@ -1,0 +1,12 @@
+{
+  "name": "simple-calculator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Простейший калькулятор в терминале",
+  "scripts": {
+    "start": "node calculator.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
