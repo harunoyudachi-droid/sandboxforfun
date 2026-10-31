@@ -1,0 +1,45 @@
+name: Fate Windows
+on:
+  push:
+    branches: [main]
+    paths: ['fate/**', '.github/workflows/fate.yml']
+  pull_request:
+    paths: ['fate/**', '.github/workflows/fate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Check dice rules and modifier persistence
+        run: dotnet run --project fate/Tests/Fate.Tests.csproj -c Release
+      - name: Publish portable EXE
+        run: dotnet publish fate/Windows/FateDice.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o fate/publish
+      - name: Test all six approach buttons in the EXE
+        shell: pwsh
+        run: |
+          $exePath = (Resolve-Path fate/publish/FateDice.exe).Path
+          $reportPath = Join-Path $PWD 'fate/smoke-reports'
+          $process = Start-Process -FilePath $exePath -ArgumentList @('--smoke-test', "`"$reportPath`"") -WindowStyle Hidden -PassThru
+          if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'Fate UI test timed out' }
+          if ($process.ExitCode -ne 0) {
+            Get-Content (Join-Path $reportPath 'error.txt') -ErrorAction SilentlyContinue
+            throw "Fate UI test failed: $($process.ExitCode)"
+          }
+          Get-Content (Join-Path $reportPath 'smoke-test.txt')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fate-windows-x64
+          path: fate/publish/FateDice.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fate-test-reports
+          path: fate/smoke-reports/
