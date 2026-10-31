@@ -1,0 +1,45 @@
+name: Windows Desktop
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Parser, session and persistence checks
+        run: dotnet run --project desktop/Tests/Calculator.Tests.csproj -c Release
+      - name: Publish portable Windows x64 EXE
+        run: dotnet publish desktop/Windows/EngineeringCalculator.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o desktop/publish
+      - name: Launch EXE and test desktop interface
+        shell: pwsh
+        run: |
+          $exePath = (Resolve-Path desktop/publish/EngineeringCalculator.exe).Path
+          $reportPath = Join-Path $PWD 'desktop/smoke-reports'
+          $process = Start-Process -FilePath $exePath -ArgumentList @('--smoke-test', "`"$reportPath`"") -WindowStyle Hidden -PassThru
+          if (-not $process.WaitForExit(120000)) { $process.Kill(); throw 'Desktop smoke test timed out' }
+          if ($process.ExitCode -ne 0) {
+            Get-Content (Join-Path $reportPath 'error.txt') -ErrorAction SilentlyContinue
+            throw "Desktop smoke test failed: $($process.ExitCode)"
+          }
+          Get-Content (Join-Path $reportPath 'smoke-test.txt')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engineering-calculator-windows-x64
+          path: desktop/publish/EngineeringCalculator.exe
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-test-reports
+          path: desktop/smoke-reports/

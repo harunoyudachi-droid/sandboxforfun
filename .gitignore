@@ -7,3 +7,9 @@ local.properties
 *.keystore
 node_modules/
 *.log
+**/bin/
+**/obj/
+desktop/publish/
+desktop/smoke-reports/
+.vs/
+
